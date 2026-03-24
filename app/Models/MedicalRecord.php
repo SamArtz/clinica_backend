@@ -10,7 +10,6 @@ class MedicalRecord extends Model
 {
     use HasFactory;
 
-    // Campos que el seeder y el API pueden llenar
     protected $fillable = [
         'patient_id',
         'blood_type',
@@ -19,13 +18,9 @@ class MedicalRecord extends Model
         'family_history',
         'current_medications',
         'height',
-        'weight'
+        'weight',
     ];
 
-    /**
-     * Relación 1:1 con Pacientes
-     * Cada expediente clínico pertenece a un único paciente
-     */
     public function patient(): BelongsTo
     {
         return $this->belongsTo(Patient::class);

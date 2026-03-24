@@ -2,81 +2,117 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\User;
-use App\Models\Patient;
-use App\Models\DoctorSchedule;
-use Spatie\Permission\Models\Role;
-use App\Models\MedicalRecord;
 use App\Models\Appointment;
+use App\Models\DoctorSchedule;
+use App\Models\MedicalRecord;
+use App\Models\Patient;
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Crear los roles PRIMERO
-        $adminRole = Role::create(['name' => 'admin']);
-        $doctorRole = Role::create(['name' => 'doctor']);
-        $assistantRole = Role::create(['name' => 'assistant']);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        // 2. Crear el Paciente PRIMERO (para que el ID 1 exista antes que el expediente)
-        $patient = Patient::create([
-            'first_name' => 'John',
-            'last_name' => 'Doe',
-            'email' => 'john@example.com',
-            'birth_date' => '1990-01-01',
-        ]);
+        $adminRole = Role::firstOrCreate(['name' => 'admin']);
+        $doctorRole = Role::firstOrCreate(['name' => 'doctor']);
+        $assistantRole = Role::firstOrCreate(['name' => 'assistant']);
 
-        // 3. Crear el Expediente (ahora que el patient_id 1 existe)
-        MedicalRecord::create([
-            'patient_id' => $patient->id,
-            'blood_type' => 'O+',
-            'allergies' => 'Ninguna',
-            'chronic_diseases' => 'Ninguna',
-        ]);
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@clinica.com'],
+            ['name' => 'Admin Sistema', 'password' => Hash::make('password')]
+        );
+        $admin->syncRoles([$adminRole]);
 
-        // 4. Crear el Médico
-        $doctor = User::create([
-            'name' => 'Dr. Gregory House',
-            'email' => 'house@clinica.com',
-            'password' => bcrypt('password'),
-        ]);
-        $doctor->assignRole($doctorRole); // Se asigna DESPUÉS de crear al $doctor
+        $assistant = User::firstOrCreate(
+            ['email' => 'assistant@clinica.com'],
+            ['name' => 'Asistente Clínica', 'password' => Hash::make('password')]
+        );
+        $assistant->syncRoles([$assistantRole]);
 
-        // 5. Crear el Horario del médico
-        DoctorSchedule::create([
-            'user_id' => $doctor->id,
-            'day_of_week' => 1, 
-            'start_time' => '08:00:00',
-            'end_time' => '14:00:00',
-            'is_active' => true,
-        ]);
+        $doctorOne = User::firstOrCreate(
+            ['email' => 'house@clinica.com'],
+            ['name' => 'Dr. Gregory House', 'password' => Hash::make('password')]
+        );
+        $doctorOne->syncRoles([$doctorRole]);
 
-        // 6. Crear Administrador
-        $admin = User::create([
-            'name' => 'Admin Sistema',
-            'email' => 'admin@clinica.com',
-            'password' => bcrypt('password'),
-        ]);
-        $admin->assignRole($adminRole);
+        $doctorTwo = User::firstOrCreate(
+            ['email' => 'wilson@clinica.com'],
+            ['name' => 'Dr. James Wilson', 'password' => Hash::make('password')]
+        );
+        $doctorTwo->syncRoles([$doctorRole]);
 
-        // 7. Crear Asistente
-        $assistant = User::create([
-            'name' => 'Asistente Clínica',
-            'email' => 'assistant@clinica.com',
-            'password' => bcrypt('password'),
-        ]);
-        $assistant->assignRole($assistantRole);
-        
-        $this->command->info('¡Datos de prueba creados con éxito!');
+        foreach ([$doctorOne, $doctorTwo] as $doctor) {
+            foreach ([1, 2, 3, 4, 5] as $day) {
+                DoctorSchedule::firstOrCreate([
+                    'doctor_id' => $doctor->id,
+                    'day_of_week' => $day,
+                    'start_time' => '08:00:00',
+                    'end_time' => '12:00:00',
+                ], [
+                    'is_active' => true,
+                ]);
+            }
 
-        Appointment::create([
-        'doctor_id' => $doctor->id,
-        'patient_id' => $patient->id,
-        'appointment_date' => now()->addDay()->format('Y-m-d'),
-        'appointment_time' => '10:00',
-        'reason' => 'Chequeo rutinario de ejemplo',
-        'status' => 'confirmed'
-        ]);
+            DoctorSchedule::firstOrCreate([
+                'doctor_id' => $doctor->id,
+                'day_of_week' => 6,
+                'start_time' => '15:00:00',
+                'end_time' => '17:00:00',
+            ], [
+                'is_active' => true,
+            ]);
+        }
+
+        $patients = Patient::factory()->count(20)->create();
+
+        foreach ($patients as $patient) {
+            MedicalRecord::factory()->create([
+                'patient_id' => $patient->id,
+            ]);
+        }
+
+        $appointmentSlots = ['08:00', '09:00', '10:00', '11:00'];
+        $currentDate = Carbon::now()->startOfDay()->addDay();
+        $doctors = [$doctorOne, $doctorTwo];
+        $createdAppointments = 0;
+        $patientIndex = 0;
+
+        while ($createdAppointments < 20) {
+            if (in_array($currentDate->dayOfWeek, [1, 2, 3, 4, 5], true)) {
+                foreach ($appointmentSlots as $slot) {
+                    if ($createdAppointments >= 20) {
+                        break;
+                    }
+
+                    $patient = $patients[$patientIndex % $patients->count()];
+                    $doctor = $doctors[$createdAppointments % count($doctors)];
+
+                    Appointment::create([
+                        'doctor_id' => $doctor->id,
+                        'patient_id' => $patient->id,
+                        'appointment_date' => $currentDate->format('Y-m-d'),
+                        'appointment_time' => $slot,
+                        'reason' => 'Consulta de control',
+                        'notes' => 'Cita generada por seeder',
+                        'status' => $createdAppointments % 2 === 0 ? 'confirmed' : 'pending',
+                    ]);
+
+                    $createdAppointments++;
+                    $patientIndex++;
+                }
+            }
+
+            $currentDate->addDay();
+        }
+
+        $this->command?->info('Datos de prueba generados correctamente.');
+        $this->command?->info('Usuarios de prueba: admin@clinica.com / house@clinica.com / assistant@clinica.com');
+        $this->command?->info('Contraseña por defecto: password');
     }
 }

@@ -4,69 +4,41 @@ namespace App\Policies;
 
 use App\Models\MedicalRecord;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class MedicalRecordPolicy
 {
-    /**
-     * Determine whether the user can view any models.
-     */
-
-    public function update(User $user, MedicalRecord $medicalRecord): bool
-    {
-    // El asistente NO puede editar expediente (punto 6)
-        return $user->hasRole(['admin', 'doctor']);
-    }
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->hasAnyRole(['admin', 'assistant', 'doctor']);
     }
 
-    /**
-     * Determine whether the user can view the model.
-     */
     public function view(User $user, MedicalRecord $medicalRecord): bool
     {
-        return false;
+        return $user->hasAnyRole(['admin', 'assistant', 'doctor']);
     }
 
-    /**
-     * Determine whether the user can create models.
-     */
     public function create(User $user): bool
     {
-        return false;
+        return $user->hasAnyRole(['admin', 'doctor']);
     }
 
-    /**
-     * Determine whether the user can update the model.
-     */
     public function update(User $user, MedicalRecord $medicalRecord): bool
     {
-        return false;
+        return $user->hasAnyRole(['admin', 'doctor']);
     }
 
-    /**
-     * Determine whether the user can delete the model.
-     */
     public function delete(User $user, MedicalRecord $medicalRecord): bool
     {
-        return false;
+        return $user->hasRole('admin');
     }
 
-    /**
-     * Determine whether the user can restore the model.
-     */
     public function restore(User $user, MedicalRecord $medicalRecord): bool
     {
-        return false;
+        return $user->hasRole('admin');
     }
 
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
     public function forceDelete(User $user, MedicalRecord $medicalRecord): bool
     {
-        return false;
+        return $user->hasRole('admin');
     }
 }

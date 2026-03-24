@@ -1,0 +1,54 @@
+{
+  "info": {
+    "name": "Clinica Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Colección base para probar login y creación de citas."
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000" },
+    { "key": "token", "value": "" },
+    { "key": "doctor_id", "value": "3" },
+    { "key": "patient_id", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Login doctor House",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"house@clinica.com\",\n  \"password\": \"password\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/login",
+          "host": ["{{base_url}}"],
+          "path": ["api", "login"]
+        }
+      }
+    },
+    {
+      "name": "Crear cita",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"doctor_id\": {{doctor_id}},\n  \"patient_id\": {{patient_id}},\n  \"appointment_date\": \"2026-03-30\",\n  \"appointment_time\": \"10:00\",\n  \"reason\": \"Consulta de prueba exitosa\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/appointments",
+          "host": ["{{base_url}}"],
+          "path": ["api", "appointments"]
+        }
+      }
+    }
+  ]
+}

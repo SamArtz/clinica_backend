@@ -1,58 +1,96 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Clínica Digital Backend
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Proyecto del workshop **Sistema de Gestión de Citas Médicas** con **Laravel 11 + Filament 3 + Sanctum + Spatie Permission**.
 
-## About Laravel
+## Esta versión queda preparada para PostgreSQL
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- `.env.example` ya viene configurado para **PostgreSQL**.
+- Panel administrativo con Filament.
+- API REST para login y creación de citas.
+- Validación de horario por médico.
+- Bloqueo de citas duplicadas para el mismo médico, fecha y hora.
+- Roles base: **admin**, **doctor**, **assistant**.
+- Seeders y factories con datos de prueba.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Requisitos
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- PHP 8.2+
+- Composer
+- Node.js + npm
+- PostgreSQL
 
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Instalación rápida con PostgreSQL
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+npm install
+copy .env.example .env
+php artisan key:generate
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+## Base de datos PostgreSQL
 
-## Contributing
+Crear una base llamada `clinica_backend` y luego dejar estos datos en `.env` si usas el usuario por defecto:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```env
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=clinica_backend
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+```
 
-## Code of Conduct
+Si tu contraseña de PostgreSQL es otra, solo cambia `DB_PASSWORD`.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Migrar y poblar
 
-## Security Vulnerabilities
+```bash
+php artisan migrate:fresh --seed
+npm run dev
+php -S 127.0.0.1:8088 -t public
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Accesos de prueba
 
-## License
+- **Admin**: `admin@clinica.com` / `password`
+- **Doctor**: `house@clinica.com` / `password`
+- **Doctor**: `wilson@clinica.com` / `password`
+- **Asistente**: `assistant@clinica.com` / `password`
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## URLs importantes
+
+- **Inicio**: `http://127.0.0.1:8088/`
+- **Panel Filament**: `http://127.0.0.1:8088/admin`
+- **API login**: `POST http://127.0.0.1:8088/api/login`
+- **API citas**: `POST http://127.0.0.1:8088/api/appointments`
+
+## Postman
+
+### Login
+
+```json
+{
+  "email": "house@clinica.com",
+  "password": "password"
+}
+```
+
+### Crear cita
+
+Usa el token del login como Bearer Token y envía:
+
+```json
+{
+  "patient_id": 1,
+  "doctor_id": 3,
+  "appointment_date": "2026-03-30",
+  "appointment_time": "09:00",
+  "reason": "Consulta general",
+  "status": "confirmed"
+}
+```
+
+## Nota
+
+El proyecto **ya es Laravel**. No necesitas crear otro proyecto Laravel aparte. Lo que sí necesitas es tener un entorno para correr Laravel: PHP, Composer, Node.js y PostgreSQL.

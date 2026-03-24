@@ -2,45 +2,30 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Spatie\Permission\Traits\HasRoles;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
-    /**
-     * Los atributos que se pueden asignar masivamente.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'email',
         'password',
     ];
 
-    /**
-     * Los atributos que deben estar ocultos para la serialización.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Los atributos que deben ser convertidos.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -49,13 +34,18 @@ class User extends Authenticatable implements FilamentUser
         ];
     }
 
-    /**
-     * Determina quién puede acceder al panel de Filament.
-     * Por ahora permitimos a todos los usuarios autenticados.
-     */
     public function canAccessPanel(Panel $panel): bool
     {
-        // En el futuro puedes cambiar esto por: return $this->hasRole('admin');
-        return true;
+        return $this->hasAnyRole(['admin', 'doctor', 'assistant']);
+    }
+
+    public function appointments(): HasMany
+    {
+        return $this->hasMany(Appointment::class, 'doctor_id');
+    }
+
+    public function doctorSchedules(): HasMany
+    {
+        return $this->hasMany(DoctorSchedule::class, 'doctor_id');
     }
 }
