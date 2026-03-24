@@ -27,9 +27,27 @@ class AppointmentsChart extends ChartWidget
                 [
                     'label' => 'Citas',
                     'data' => $data,
+                    'fill' => false,
+                    'tension' => 0.25,
                 ],
             ],
             'labels' => $labels,
+        ];
+    }
+
+    protected function getOptions(): array
+    {
+        return [
+            'scales' => [
+                'y' => [
+                    'beginAtZero' => true,
+                    'min' => 0,
+                    'ticks' => [
+                        'precision' => 0,
+                        'stepSize' => 1,
+                    ],
+                ],
+            ],
         ];
     }
 
