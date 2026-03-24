@@ -12,6 +12,7 @@ use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 class UserResource extends Resource
 {
@@ -29,18 +30,22 @@ class UserResource extends Resource
     {
         return $form->schema([
             TextInput::make('name')->label('Nombre')->required()->maxLength(255),
-            TextInput::make('email')->email()->required()->unique(ignoreRecord: true),
+            TextInput::make('email')->label('Correo')->email()->required()->unique(ignoreRecord: true),
             TextInput::make('password')
+                ->label('Contraseña')
                 ->password()
                 ->revealable()
                 ->required(fn (string $operation): bool => $operation === 'create')
                 ->dehydrated(fn (?string $state): bool => filled($state))
                 ->dehydrateStateUsing(fn (string $state): string => Hash::make($state)),
-            Select::make('roles')
-                ->relationship('roles', 'name')
-                ->multiple()
-                ->preload()
-                ->required(),
+            Select::make('role_name')
+                ->label('Rol')
+                ->options(fn () => Role::query()->orderBy('name')->pluck('name', 'name')->all())
+                ->required()
+                ->dehydrated(false)
+                ->afterStateHydrated(function (Select $component, ?User $record): void {
+                    $component->state($record?->roles->first()?->name);
+                }),
         ]);
     }
 
@@ -49,19 +54,24 @@ class UserResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('name')->label('Nombre')->searchable()->sortable(),
-                TextColumn::make('email')->searchable(),
+                TextColumn::make('email')->label('Correo')->searchable(),
                 TextColumn::make('roles.name')->label('Rol')->badge(),
                 TextColumn::make('created_at')->label('Creado')->dateTime('d/m/Y H:i'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()->label('Editar'),
+                Tables\Actions\DeleteAction::make()
+                    ->label('Eliminar')
+                    ->visible(fn (User $record): bool => auth()->id() !== $record->id),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ]);
+            ->bulkActions([]);
+    }
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()
+            ->select(['id', 'name', 'email', 'created_at'])
+            ->with('roles');
     }
 
     public static function canViewAny(): bool
@@ -81,7 +91,7 @@ class UserResource extends Resource
 
     public static function canDelete($record): bool
     {
-        return auth()->user()?->hasRole('admin') ?? false;
+        return (auth()->user()?->hasRole('admin') ?? false) && auth()->id() !== $record->id;
     }
 
     public static function shouldRegisterNavigation(): bool

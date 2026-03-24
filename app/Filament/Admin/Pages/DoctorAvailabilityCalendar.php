@@ -33,12 +33,14 @@ class DoctorAvailabilityCalendar extends Page
 
     public function mount(): void
     {
-        Carbon::setLocale(app()->getLocale());
+        Carbon::setLocale(config('app.locale'));
+        date_default_timezone_set(config('app.timezone'));
 
-        $month = max(1, min(12, (int) request()->integer('month', now()->month)));
-        $year = (int) request()->integer('year', now()->year);
+        $today = now(config('app.timezone'));
+        $month = max(1, min(12, (int) request()->integer('month', $today->month)));
+        $year = (int) request()->integer('year', $today->year);
 
-        $this->buildCalendar(Carbon::createFromDate($year, $month, 1)->startOfMonth());
+        $this->buildCalendar(Carbon::create($year, $month, 1, 0, 0, 0, config('app.timezone'))->startOfMonth());
     }
 
     protected function buildCalendar(Carbon $currentMonth): void
@@ -47,27 +49,32 @@ class DoctorAvailabilityCalendar extends Page
         $monthEnd = $currentMonth->copy()->endOfMonth();
 
         $doctors = User::role('doctor')
-            ->with(['doctorSchedules' => fn ($query) => $query->where('is_active', true)])
+            ->select(['id', 'name'])
+            ->with(['doctorSchedules' => fn ($query) => $query
+                ->select(['id', 'doctor_id', 'day_of_week', 'start_time', 'end_time', 'is_active'])
+                ->where('is_active', true)])
             ->orderBy('name')
             ->get();
 
-        $appointments = Appointment::query()
-            ->selectRaw('doctor_id, appointment_date::date as appointment_day, COUNT(*) as total')
+        $appointmentCounts = Appointment::query()
+            ->selectRaw('doctor_id, appointment_date, COUNT(*) as total')
             ->whereBetween('appointment_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
-            ->groupBy('doctor_id', 'appointment_day')
+            ->groupBy('doctor_id', 'appointment_date')
             ->get()
-            ->keyBy(fn ($row) => $row->doctor_id . '|' . Carbon::parse($row->appointment_day)->format('Y-m-d'));
+            ->keyBy(fn ($row) => $row->doctor_id . '|' . Carbon::parse($row->appointment_date, config('app.timezone'))->toDateString());
 
         $days = [];
         $cursor = $monthStart->copy();
+        $today = now(config('app.timezone'))->toDateString();
 
         while ($cursor->lte($monthEnd)) {
             $day = $cursor->copy();
             $doctorEntries = [];
+            $dayKey = $day->toDateString();
 
             foreach ($doctors as $doctor) {
                 $schedule = $doctor->doctorSchedules->firstWhere('day_of_week', $day->dayOfWeekIso);
-                $appointmentCount = $appointments->get($doctor->id . '|' . $day->format('Y-m-d'));
+                $appointmentCount = $appointmentCounts->get($doctor->id . '|' . $dayKey);
 
                 $doctorEntries[] = [
                     'name' => $doctor->name,
@@ -79,11 +86,11 @@ class DoctorAvailabilityCalendar extends Page
             }
 
             $days[] = [
-                'date' => $day->format('Y-m-d'),
+                'date' => $dayKey,
                 'day' => $day->day,
                 'weekday' => ucfirst($day->translatedFormat('D')),
-                'full_label' => ucfirst($day->translatedFormat('l, d \\d\\e F \\d\\e Y')),
-                'is_today' => $day->isToday(),
+                'full_label' => ucfirst($day->translatedFormat('l, d \d\e F \d\e Y')),
+                'is_today' => $dayKey === $today,
                 'doctors' => $doctorEntries,
             ];
 
@@ -92,11 +99,12 @@ class DoctorAvailabilityCalendar extends Page
 
         $previousMonth = $currentMonth->copy()->subMonthNoOverflow();
         $nextMonth = $currentMonth->copy()->addMonthNoOverflow();
+        $todayDate = now(config('app.timezone'));
 
         $this->days = $days;
         $this->monthLabel = ucfirst($currentMonth->translatedFormat('F Y'));
         $this->previousMonthUrl = static::getUrl(['month' => $previousMonth->month, 'year' => $previousMonth->year]);
-        $this->currentMonthUrl = static::getUrl(['month' => now()->month, 'year' => now()->year]);
+        $this->currentMonthUrl = static::getUrl(['month' => $todayDate->month, 'year' => $todayDate->year]);
         $this->nextMonthUrl = static::getUrl(['month' => $nextMonth->month, 'year' => $nextMonth->year]);
     }
 }

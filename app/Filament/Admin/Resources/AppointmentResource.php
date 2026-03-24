@@ -6,6 +6,7 @@ use App\Filament\Admin\Resources\AppointmentResource\Pages;
 use App\Models\Appointment;
 use App\Models\Patient;
 use App\Models\User;
+use App\Support\AppointmentAvailability;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -40,19 +41,41 @@ class AppointmentResource extends Resource
                 ->schema([
                     Select::make('patient_id')
                         ->label('Paciente')
-                        ->options(Patient::query()->orderBy('first_name')->get()->mapWithKeys(fn (Patient $patient) => [
-                            $patient->id => $patient->full_name,
-                        ]))
                         ->searchable()
-                        ->required(),
+                        ->preload(false)
+                        ->required()
+                        ->getSearchResultsUsing(fn (string $search): array => Patient::query()
+                            ->select(['id', 'first_name', 'last_name', 'document_number', 'phone'])
+                            ->where(function ($query) use ($search): void {
+                                $query
+                                    ->where('first_name', 'ilike', "%{$search}%")
+                                    ->orWhere('last_name', 'ilike', "%{$search}%")
+                                    ->orWhere('document_number', 'ilike', "%{$search}%")
+                                    ->orWhere('phone', 'ilike', "%{$search}%");
+                            })
+                            ->orderBy('first_name')
+                            ->limit(20)
+                            ->get()
+                            ->mapWithKeys(fn (Patient $patient): array => [$patient->id => $patient->full_name . ' · ' . ($patient->document_number ?: 'Sin documento')])
+                            ->all())
+                        ->getOptionLabelUsing(fn ($value): ?string => Patient::find($value)?->full_name),
                     Select::make('doctor_id')
                         ->label('Médico')
                         ->options(User::role('doctor')->orderBy('name')->pluck('name', 'id'))
                         ->searchable()
                         ->required(),
-                    DatePicker::make('appointment_date')->label('Fecha')->required(),
-                    TimePicker::make('appointment_time')->label('Hora')->seconds(false)->required(),
+                    DatePicker::make('appointment_date')
+                        ->label('Fecha')
+                        ->native(false)
+                        ->minDate(AppointmentAvailability::today())
+                        ->required()
+                        ->rule('after_or_equal:' . AppointmentAvailability::today()->toDateString()),
+                    TimePicker::make('appointment_time')
+                        ->label('Hora')
+                        ->seconds(false)
+                        ->required(),
                     Select::make('status')
+                        ->label('Estado')
                         ->options([
                             'pending' => 'Pendiente',
                             'confirmed' => 'Confirmada',
@@ -93,6 +116,7 @@ class AppointmentResource extends Resource
                     ->relationship('doctor', 'name')
                     ->visible(fn () => ! (auth()->user()?->hasRole('doctor') ?? false)),
                 SelectFilter::make('status')
+                    ->label('Estado')
                     ->options([
                         'pending' => 'Pendiente',
                         'confirmed' => 'Confirmada',
@@ -101,23 +125,25 @@ class AppointmentResource extends Resource
                     ]),
                 Filter::make('today')
                     ->label('Solo hoy')
-                    ->query(fn (Builder $query): Builder => $query->whereDate('appointment_date', today())),
+                    ->query(fn (Builder $query): Builder => $query->whereDate('appointment_date', AppointmentAvailability::today())),
             ])
             ->defaultSort('appointment_date')
             ->actions([
-                Tables\Actions\EditAction::make()->visible(fn () => auth()->user()?->hasAnyRole(['admin', 'assistant'])),
-                Tables\Actions\DeleteAction::make()->visible(fn () => auth()->user()?->hasAnyRole(['admin', 'assistant'])),
+                Tables\Actions\EditAction::make()->label('Editar')->visible(fn () => auth()->user()?->hasAnyRole(['admin', 'assistant'])),
+                Tables\Actions\DeleteAction::make()->label('Eliminar')->visible(fn () => auth()->user()?->hasAnyRole(['admin', 'assistant'])),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()->visible(fn () => auth()->user()?->hasAnyRole(['admin', 'assistant'])),
-                ]),
-            ]);
+            ->bulkActions([]);
     }
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->with(['doctor', 'patient']);
+        $query = parent::getEloquentQuery()
+            ->select(['id', 'doctor_id', 'patient_id', 'appointment_date', 'appointment_time', 'reason', 'notes', 'status', 'created_at', 'updated_at'])
+            ->with([
+                'doctor:id,name',
+                'patient:id,first_name,last_name',
+            ]);
+
         $user = auth()->user();
 
         if ($user?->hasRole('doctor')) {

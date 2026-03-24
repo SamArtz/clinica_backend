@@ -10,10 +10,15 @@ class ListPatients extends ListRecords
 {
     protected static string $resource = PatientResource::class;
 
+    public function getTitle(): string
+    {
+        return 'Pacientes';
+    }
+
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            Actions\CreateAction::make()->label('Nuevo paciente'),
         ];
     }
 }

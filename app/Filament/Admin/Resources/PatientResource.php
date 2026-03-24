@@ -36,19 +36,17 @@ class PatientResource extends Resource
 
         return $form->schema([
             Section::make('Datos del paciente')
-                ->description('Asistentes y administradores pueden registrar y actualizar datos personales.')
                 ->columns(2)
                 ->schema([
                     TextInput::make('first_name')->label('Nombres')->required()->maxLength(255)->disabled(! $canEditPatientData),
                     TextInput::make('last_name')->label('Apellidos')->required()->maxLength(255)->disabled(! $canEditPatientData),
-                    TextInput::make('email')->email()->required()->unique(ignoreRecord: true)->disabled(! $canEditPatientData),
-                    TextInput::make('phone')->label('Teléfono')->tel()->maxLength(50)->disabled(! $canEditPatientData),
-                    DatePicker::make('birth_date')->label('Fecha de nacimiento')->required()->disabled(! $canEditPatientData),
+                    TextInput::make('email')->label('Correo')->email()->required()->unique(ignoreRecord: true)->disabled(! $canEditPatientData),
+                    TextInput::make('phone')->label('Teléfono')->tel()->maxLength(50)->unique(ignoreRecord: true)->disabled(! $canEditPatientData),
+                    DatePicker::make('birth_date')->label('Fecha de nacimiento')->native(false)->required()->disabled(! $canEditPatientData),
                     TextInput::make('document_number')->label('Documento')->unique(ignoreRecord: true)->disabled(! $canEditPatientData),
                     Textarea::make('address')->label('Dirección')->columnSpanFull()->disabled(! $canEditPatientData),
                 ]),
             Section::make('Expediente clínico')
-                ->description('Solo administradores y médicos pueden modificar el expediente clínico.')
                 ->relationship('medicalRecord')
                 ->columns(2)
                 ->schema([
@@ -57,8 +55,8 @@ class PatientResource extends Resource
                     Textarea::make('allergies')->label('Alergias')->disabled(! $canEditMedicalRecord),
                     Textarea::make('chronic_diseases')->label('Enfermedades crónicas')->disabled(! $canEditMedicalRecord),
                     Textarea::make('family_history')->label('Antecedentes familiares')->columnSpanFull()->disabled(! $canEditMedicalRecord),
-                    TextInput::make('height')->label('Estatura (m)')->numeric()->disabled(! $canEditMedicalRecord),
-                    TextInput::make('weight')->label('Peso (kg)')->numeric()->disabled(! $canEditMedicalRecord),
+                    TextInput::make('height')->label('Estatura (m)')->numeric()->minValue(1)->rule('gte:1')->disabled(! $canEditMedicalRecord),
+                    TextInput::make('weight')->label('Peso (kg)')->numeric()->minValue(1)->rule('gte:1')->disabled(! $canEditMedicalRecord),
                 ]),
         ]);
     }
@@ -71,7 +69,7 @@ class PatientResource extends Resource
                 ->schema([
                     TextEntry::make('first_name')->label('Nombres'),
                     TextEntry::make('last_name')->label('Apellidos'),
-                    TextEntry::make('email'),
+                    TextEntry::make('email')->label('Correo'),
                     TextEntry::make('phone')->label('Teléfono'),
                     TextEntry::make('birth_date')->date()->label('Fecha de nacimiento'),
                     TextEntry::make('document_number')->label('Documento'),
@@ -96,22 +94,26 @@ class PatientResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('full_name')->label('Paciente')->searchable(['first_name', 'last_name'])->sortable(),
-                TextColumn::make('email')->searchable(),
+                TextColumn::make('email')->label('Correo')->searchable(),
                 TextColumn::make('phone')->label('Teléfono')->searchable(),
+                TextColumn::make('document_number')->label('Documento')->searchable(),
                 TextColumn::make('birth_date')->label('Nacimiento')->date(),
                 TextColumn::make('created_at')->label('Registro')->dateTime('d/m/Y H:i')->sortable(),
             ])
             ->filters([])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make()->visible(fn () => auth()->user()?->hasRole('admin')),
+                Tables\Actions\ViewAction::make()->label('Ver'),
+                Tables\Actions\EditAction::make()->label('Editar'),
+                Tables\Actions\DeleteAction::make()->label('Eliminar')->visible(fn () => auth()->user()?->hasRole('admin')),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()->visible(fn () => auth()->user()?->hasRole('admin')),
-                ]),
-            ]);
+            ->bulkActions([]);
+    }
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()
+            ->select(['id', 'first_name', 'last_name', 'email', 'phone', 'birth_date', 'document_number', 'created_at'])
+            ->with('medicalRecord');
     }
 
     public static function canCreate(): bool

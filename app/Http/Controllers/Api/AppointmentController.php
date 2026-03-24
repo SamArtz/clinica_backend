@@ -5,16 +5,16 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreAppointmentRequest;
 use App\Models\Appointment;
-use App\Models\DoctorSchedule;
 use App\Models\User;
-use Carbon\Carbon;
+use App\Support\AppointmentAvailability;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 
 class AppointmentController extends Controller
 {
     public function store(StoreAppointmentRequest $request): JsonResponse
     {
-        $doctor = User::find($request->doctor_id);
+        $doctor = User::find($request->integer('doctor_id'));
 
         if (! $doctor || ! $doctor->hasRole('doctor')) {
             return response()->json([
@@ -22,42 +22,43 @@ class AppointmentController extends Controller
             ], 422);
         }
 
-        $date = Carbon::parse($request->appointment_date);
-        $time = $request->appointment_time;
-        $dayOfWeek = $date->dayOfWeek;
+        $date = $request->string('appointment_date')->toString();
+        $time = $request->string('appointment_time')->toString();
 
-        $isWithinSchedule = DoctorSchedule::query()
-            ->where('doctor_id', $request->doctor_id)
-            ->where('day_of_week', $dayOfWeek)
-            ->where('is_active', true)
-            ->whereTime('start_time', '<=', $time)
-            ->whereTime('end_time', '>=', $time)
-            ->exists();
+        if (AppointmentAvailability::isPastDate($date)) {
+            return response()->json([
+                'message' => 'La fecha de la cita no puede estar en el pasado.',
+            ], 422);
+        }
 
-        if (! $isWithinSchedule) {
+        if (! AppointmentAvailability::isWithinDoctorSchedule($doctor->id, $date, $time)) {
             return response()->json([
                 'message' => 'El médico no tiene horario disponible en ese bloque de tiempo.',
             ], 422);
         }
 
-        $isAlreadyBooked = Appointment::query()
-            ->where('doctor_id', $request->doctor_id)
-            ->where('appointment_date', $request->appointment_date)
-            ->where('appointment_time', $time)
-            ->whereNotIn('status', ['cancelled'])
-            ->exists();
-
-        if ($isAlreadyBooked) {
+        if (AppointmentAvailability::hasConflict($doctor->id, $date, $time)) {
             return response()->json([
-                'message' => 'El médico ya tiene una cita programada para esta fecha y hora.',
+                'message' => 'Esa hora no está disponible.',
             ], 422);
         }
 
-        $appointment = Appointment::create([
-            ...$request->validated(),
-            'status' => $request->input('status', 'pending'),
-            'notes' => $request->input('notes'),
-        ]);
+        try {
+            $appointment = Appointment::create([
+                ...$request->validated(),
+                'appointment_time' => AppointmentAvailability::normalizeTime($time),
+                'status' => $request->input('status', 'pending'),
+                'notes' => $request->input('notes'),
+            ]);
+        } catch (QueryException $exception) {
+            if ((string) $exception->getCode() === '23505') {
+                return response()->json([
+                    'message' => 'Esa hora no está disponible.',
+                ], 422);
+            }
+
+            throw $exception;
+        }
 
         return response()->json([
             'message' => 'Cita creada exitosamente.',

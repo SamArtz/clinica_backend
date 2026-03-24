@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Resources\PatientResource\Pages;
 
 use App\Filament\Admin\Resources\PatientResource;
+use Filament\Actions\Action;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 
@@ -13,8 +14,17 @@ class EditPatient extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\ViewAction::make(),
-            Actions\DeleteAction::make()->visible(fn () => auth()->user()?->hasRole('admin')),
+            Actions\DeleteAction::make()->label('Eliminar')->visible(fn () => auth()->user()?->hasRole('admin')),
         ];
+    }
+
+    public function getTitle(): string
+    {
+        return 'Editar paciente';
+    }
+
+    protected function getSaveFormAction(): Action
+    {
+        return parent::getSaveFormAction()->label('Guardar cambios');
     }
 }

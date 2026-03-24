@@ -10,6 +10,7 @@ use App\Policies\AppointmentPolicy;
 use App\Policies\MedicalRecordPolicy;
 use App\Policies\PatientPolicy;
 use App\Policies\UserPolicy;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -21,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        date_default_timezone_set(config('app.timezone'));
+        Carbon::setLocale(config('app.locale'));
         Gate::policy(Appointment::class, AppointmentPolicy::class);
         Gate::policy(MedicalRecord::class, MedicalRecordPolicy::class);
         Gate::policy(Patient::class, PatientPolicy::class);

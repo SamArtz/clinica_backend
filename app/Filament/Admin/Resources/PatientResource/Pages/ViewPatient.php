@@ -10,10 +10,15 @@ class ViewPatient extends ViewRecord
 {
     protected static string $resource = PatientResource::class;
 
+    public function getTitle(): string
+    {
+        return 'Detalle del paciente';
+    }
+
     protected function getHeaderActions(): array
     {
         return [
-            Actions\EditAction::make(),
+            Actions\EditAction::make()->label('Editar'),
         ];
     }
 }
